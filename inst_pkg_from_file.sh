@@ -49,7 +49,7 @@ fi
 done < $PKGS
 }
 
-#MAIN
+#Main
 WhoAmI
 check_param $PKGS
 check_dup
