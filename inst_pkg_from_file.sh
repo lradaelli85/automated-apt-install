@@ -20,7 +20,8 @@ do
 #skip lines starting wih # or a space
 if [[ ! $line =~ ^#|$^ ]]
 then
-if [ `dpkg -l |awk '{print $2}' | grep ^$line$` ]
+dpkg -l $line &> /dev/null
+if [ "$?" -eq 0 ]
  then
    echo "package "$line" already installed"
    else
