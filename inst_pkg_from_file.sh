@@ -3,11 +3,15 @@
 #install a set of packages reading from a file
 
 PKGS="$1"
+function WhoAmI (){
 if [ `id -u` -ne 0 ]
  then
    echo "ERROR: only root is allowed to run this script"
    exit 1;
 fi
+}
+ 
+function check_param (){
  if [ ! -f $PKGS ] || [ "$#" -ne 1 ]
    then
      echo "ERROR: no such file or directory found"
@@ -15,7 +19,20 @@ fi
      echo "USAGE: $0 packages_file"
      exit 1;
  fi
-
+}
+function check_dup(){
+local DUPS
+DUPS=`sort $PKGS |uniq -d`
+if [ ! -z "$DUPS" ]
+ then
+  echo "there are some duplicated packages"
+  echo "$DUPS"
+  exit 1;
+   else
+     echo "no duplicated packages found"
+fi
+}
+function inst_pkgs(){
 while read line
 do
 #skip lines starting wih # or a space
@@ -30,6 +47,13 @@ if [ "$?" -eq 0 ]
 fi
 fi
 done < $PKGS
+}
+
+#MAIN
+WhoAmI
+check_param $PKGS
+check_dup
+inst_pkgs
 
 
 
