@@ -12,6 +12,7 @@ fi
    then
      echo "ERROR: no such file or directory found"
      echo "check if the file with packges exists"
+     echo "USAGE: $0 packages_file"
      exit 1;
  fi
 
