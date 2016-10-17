@@ -5,5 +5,5 @@ You need then to pass as argument the file path as in this example
 
 ./inst_pkg_from_file.sh /home/luke/packages
 
-if you want to install also some .deb package,just put it in the deb_pkgs folder.
-At this moment the folder needs to be in the same directory of the script
+if you want to install also some .deb package,just put it in the deb_pkgs folder(remember to create it!!).
+At this moment the folder needs to be in the same directory of the script.
