@@ -11,24 +11,45 @@ if [ `id -u` -ne 0 ]
    exit 1;
 fi
 }
- 
+
+function check_reply(){
+  local var
+  local print_message=$1
+  until [ ! -z $var ] && ([ $var = "y" ] || [ $var = "n" ])
+   do
+    read -p "$print_message  " var
+   done
+   echo $var
+}
+
 function inst_a_deb(){
-
-local reply
+local R
 local folder="deb_pkgs/"
-
-until [ ! -z $reply ] && ([ $reply = "y" ] || [ $reply = "n" ])
-do
-read -p "do you want to install deb packages?[y/n]  " reply
-done
-if [ $reply = "y" ] && [ -d $folder ]
+R=$(check_reply "do you want to install deb packages?[y/n]do you want to install deb packages?[y/n]")
+if [ $R = "y" ] && [ -d $folder ]
  then
-    dpkg -i $folder*.deb
+    if [ `find deb_pkgs/ -iname *.deb` ]
+     then
+        #echo "install a deb"
+       apt install $folder*.deb -y
+     else
+       echo "folder is empty,skipping...."
+    fi
 fi
+R=$(check_reply "do you want to install Spotify?[y/n]")
+if [ $R = "y" ]
+ then
+    #taken from https://www.spotify.com/it/download/linux/
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys BBEBDCB318AD50EC6865090613B00F1FD2C19886
+    echo "deb http://repository.spotify.com stable non-free" | sudo tee /etc/apt/sources.list.d/spotify.list
+    apt-get update
+    apt-get install spotify-client
+fi
+
 }
 
 function check_param (){
- 
+
 local pkgs_number
 
  if [ ! -f $PKGS ] || [ "$#" -ne 1 ]
@@ -84,6 +105,3 @@ check_param $PKGS
 inst_a_deb
 check_dup
 inst_pkgs
-
-
-
