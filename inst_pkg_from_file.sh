@@ -25,7 +25,7 @@ function check_reply(){
 function inst_a_deb(){
 local R
 local folder="deb_pkgs/"
-R=$(check_reply "do you want to install deb packages?[y/n]do you want to install deb packages?[y/n]")
+R=$(check_reply "do you want to install deb packages?[y/n]")
 if [ $R = "y" ] && [ -d $folder ]
  then
     if [ `find deb_pkgs/ -iname *.deb` ]
