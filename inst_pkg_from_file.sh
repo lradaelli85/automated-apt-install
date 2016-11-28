@@ -37,11 +37,11 @@ local folder="deb_pkgs/"
 R=$(check_reply "do you want to install deb packages?[y/n]")
 if [ $R = "y" ] && [ -d $folder ]
  then
-    if [ `find $folder -type f -iname "*.deb"` ]
+    if [ `find $folder -type f -iname "*.deb" |wc -l` -gt 0 ]
      then
-      for i in `ls $folder`
+      for f in `ls $folder`
         do
-         dpkg -i $folder$i
+         dpkg -i $folder$f
          force_dep_inst $?
        done
      else
@@ -79,7 +79,8 @@ then
    read -p "for which user dropbox will be installed?  " USR
    if [ `getent passwd |grep $USR` ]
      then
-       su - $USR -c "cd /home/$USR && wget -O - $DROPBOX | tar xzf - && /home/$USR/.dropbox-dist/dropboxd && exit"
+       su - $USR -c "cd /home/$USR && wget -O dropbox.tar.gz $DROPBOX && tar xzf dropbox.tar.gz && echo open a terminal with user $USR and run "\/home/$USR/.dropbox-dist/dropboxd\/" && exit"
+       # /home/$USR/.dropbox-dist/dropboxd
      else
        echo "user does not exist,skipping installation"
   fi
@@ -90,27 +91,25 @@ fi
 R=$(check_reply "do you want to install Skype?[y/n]")
 if [ $R = "y" ]
  then
-   if [ $REL = "Debian" ]
+   if [ $REL != "Ubuntu" ]
     then
        wget -O skype.deb "http://www.skype.com/go/getskype-linux-deb"
-       if [ $ARCH = "x86_64" ] && [ `lsb_release -sc` = "jessie" ]
+       if [ $ARCH = "x86_64" ]
         then
           dpkg --add-architecture i386
           apt-get update
-          #apt-get install libc6:i386 libqt4-dbus:i386 libqt4-network:i386 libqt4-xml:i386 libqtcore4:i386 libqtgui4:i386 libqtwebkit4:i386 libstdc++6:i386 libx11-6:i386 libxext6:i386 libxss1:i386 libxv1:i386 libssl1.0.0:i386 libpulse0:i386 libasound2-plugins:i386
           dpkg -i skype.deb
           force_dep_inst $?
       else
          dpkg -i skype.deb
          force_dep_inst $?
       fi
-  elif [ $REL = "Ubuntu" ]
-    then
+  else
       add-apt-repository "deb http://archive.canonical.com/ $(lsb_release -sc) partner"
       apt-get update && apt-get install skype
       apt-get clean
       add-apt-repository -r "deb http://archive.canonical.com/ $(lsb_release -sc) partner"
-  fi
+ fi
 fi
 }
 
@@ -176,20 +175,17 @@ do
 #skip lines starting wih # or a space
 if [[ ! $line =~ ^#|$^ ]]
 then
-dpkg -l $line &> /dev/null
-if [ "$?" -eq 0 ]
- then
-   echo "package "$line" already installed"
-   else
-    apt-get install --no-install-recommends $line -y
-fi
+#dpkg -l $line &> /dev/null
+#if [ "$?" -eq 0 ]
+# then
+#   echo "package "$line" already installed"
+#   else
+    apt-get install $line -y
+#fi
 fi
 done < $1
 rm $to_inst
-#if [ `dpkg --print-foreign-architectures` = "i386" ]
-#   then
-#     dpkg --remove-architecture i386
-#fi
+
 }
 
 #Main
