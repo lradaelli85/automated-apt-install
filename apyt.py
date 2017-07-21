@@ -5,6 +5,12 @@ import sys
 import subprocess
 import re
 import platform
+import shlex
+
+apt_cache = '/usr/bin/apt-cache'
+dpkg_query = '/usr/bin/dpkg-query'
+apt_get= '/usr/bin/apt-get'
+dpkg = '/usr/bin/dpkg'
 
 def WhoAmI():
     if os.geteuid() != 0:
@@ -19,7 +25,7 @@ def ReplyYN(message):
 
 def CheckPath(file_or_folder):
     if not os.path.exists(file_or_folder):
-        print file_or_folder+' command not found'
+        print file_or_folder+' not found'
         sys.exit(1)
 
 def CheckLinuxVer():
@@ -42,6 +48,28 @@ def CheckArgs():
         sys.exit(1)
     return pkgs
 
+def RunProcess(command):
+    try:
+        args = shlex.split(command)
+        cmd = subprocess.Popen(args)
+        cmd.wait()
+    except subprocess.CalledProcessError as grepexc:
+        print "error code", grepexc.returncode, grepexc.output
+    return cmd
+
+
+def CheckProcessOutput(command):
+    try:
+        DEVNULL = open(os.devnull, 'wb')
+        args = shlex.split(command)
+        #cmd = subprocess.check_output(args ,stderr=DEVNULL)
+        cmd = subprocess.check_output(args)
+        DEVNULL.close()
+    except subprocess.CalledProcessError as grepexc:
+        cmd = "error code", grepexc.returncode, grepexc.output
+        #cmd = "not found"
+    return cmd
+
 def CheckDupPkgs():
     pack = CheckArgs()
     no_duplicates = set()
@@ -61,19 +89,18 @@ def CheckDupPkgs():
     return sorted(no_duplicates)
 
 def CheckIfInRepo(package):
-    apt_cmd = '/usr/bin/apt-cache'
-    DEVNULL = open(os.devnull, 'wb')
     IsInRepo = True
-    CheckPath(apt_cmd)
     print "check if "+package+" is in repo....."
     try:
-     ps = subprocess.Popen([apt_cmd, 'search', '-n' , '-q' , package],
+     DEVNULL = open(os.devnull, 'wb')
+     ps = subprocess.Popen([apt_cache, 'search', '-n' , '-q' , package],
                            stdout=subprocess.PIPE)
      output = subprocess.Popen(['awk', '($1=="'+package+'") {print}'],
                                stdin=ps.stdout ,stderr=DEVNULL,
                                stdout=subprocess.PIPE)
      output1 = subprocess.check_output(['wc','-l'], stdin=output.stdout)
      ps.wait()
+     DEVNULL.close()
      if int(output1) == 0:
         print package+" is not in repository.....skipping \n"
         IsInRepo = False
@@ -85,29 +112,19 @@ def CheckIfInRepo(package):
 
 def CheckIfDebIsInstalled(package):
     IsInstalled = False
-    DEVNULL = open(os.devnull, 'wb')
-    dpkg_cmd = '/usr/bin/dpkg-query'
     print 'checking '+package+'...'
-    try:
-      cmd = subprocess.check_output([dpkg_cmd , '-W' ,
-                      '-f=\'${Status} ${Version}\'\n', package ]
-                      ,stderr=DEVNULL)
-      DEVNULL.close()
-      if 'not-installed' in str(cmd) or 'deinstall' in str(cmd):
-          print package+' is not installed....ok\n'
-      else:
-          print package+' is installed....skipping\n'
-          IsInstalled = True
-    except subprocess.CalledProcessError:
-    #this is the case when dpkg-query returns
-    #dpkg-query: no packages found matching package
-      print package+' is not installed....ok\n'
+    cmd = CheckProcessOutput(dpkg_query+' -W -f=\'${Status} ${Version}\' '+package)
+    if 'not-installed' in str(cmd) or 'deinstall' in str(cmd):
+        print package+' is not installed....ok\n'
+    elif 'install ok' in cmd:
+        print package+' is installed....skipping\n'
+        IsInstalled = True
+    else:
+        IsInstalled = False
     return IsInstalled
 
 
 def InstFromList():
-    dpkg_cmd = '/usr/bin/dpkg-query'
-    CheckPath(dpkg_cmd)
     packages_list = CheckDupPkgs()
     for p in packages_list:
          IsInst = CheckIfDebIsInstalled(p)
@@ -117,22 +134,20 @@ def InstFromList():
                  InstFromRepo(p)
 
 def InstFromRepo(package):
-    apt_cmd = '/usr/bin/apt-get'
-    DEVNULL = open(os.devnull, 'wb')
-    CheckPath(apt_cmd)
-    try:
-        cmd = subprocess.Popen([apt_cmd , 'install' , '--no-install-recommends'
-                               , package ])
-        cmd.wait()
-    except:
-        print "error connecting to repositories,check internet connectivity"
-    print "\n"
+    RunProcess(apt_get+' install --no,install-recommends '+package)
+    #try:
+    #    DEVNULL = open(os.devnull, 'wb')
+    #    cmd = subprocess.Popen([apt_get , 'install' , '--no-install-recommends'
+    #                           , package ])
+    #    cmd.wait()
+    #    DEVNULL.close()
+    #except:
+    #    print "error connecting to repositories,check internet connectivity"
+    #print "\n"
 
 
 def InstFromFile(package):
-    dpkg_cmd = '/usr/bin/dpkg'
-    CheckPath(dpkg_cmd)
-    cmd = subprocess.call([dpkg_cmd , '-i' , package] )
+    cmd = subprocess.call([dpkg , '-i' , package] )
     if cmd != 0:
         print "forcing dependencies installation"
         try:
@@ -251,8 +266,14 @@ if __name__ == "__main__":
     WhoAmI()
     linux_distro = CheckLinuxVer()
     if linux_distro[0] == "Ubuntu" or linux_distro[0] == "Debian":
-        InstFromList()
-        InstFromDebFolder()
-        InstExtras()
+        for i in apt_get,apt_cache,dpkg,dpkg_query:
+            CheckPath(i)
+        #InstFromList()
+        #InstFromDebFolder()
+        #InstExtras()
+        CheckIfDebIsInstalled("vim")
+        CheckIfDebIsInstalled("vimsss")
+        CheckIfDebIsInstalled("calibre")
+        CheckIfDebIsInstalled("atom")
     else:
         print "unsupported Linux distro.Works only with Debian/Ubuntu"
