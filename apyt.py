@@ -11,6 +11,7 @@ apt_cache = '/usr/bin/apt-cache'
 dpkg_query = '/usr/bin/dpkg-query'
 apt_get= '/usr/bin/apt-get'
 dpkg = '/usr/bin/dpkg'
+apt_key = '/usr/bin/apt-key'
 
 def WhoAmI():
     if os.geteuid() != 0:
@@ -54,20 +55,16 @@ def RunProcess(command):
         cmd = subprocess.Popen(args)
         cmd.wait()
     except subprocess.CalledProcessError as grepexc:
-        print "error code", grepexc.returncode, grepexc.output
+        cmd = "error code", grepexc.returncode, grepexc.output
     return cmd
 
 
 def CheckProcessOutput(command):
     try:
-        DEVNULL = open(os.devnull, 'wb')
         args = shlex.split(command)
-        #cmd = subprocess.check_output(args ,stderr=DEVNULL)
         cmd = subprocess.check_output(args)
-        DEVNULL.close()
     except subprocess.CalledProcessError as grepexc:
         cmd = "error code", grepexc.returncode, grepexc.output
-        #cmd = "not found"
     return cmd
 
 def CheckDupPkgs():
@@ -85,7 +82,6 @@ def CheckDupPkgs():
                 sys.exit(1)
             else:
                 no_duplicates.add(stritem)
-    print "no duplicated packeges found!"
     return sorted(no_duplicates)
 
 def CheckIfInRepo(package):
@@ -112,14 +108,15 @@ def CheckIfInRepo(package):
 
 def CheckIfDebIsInstalled(package):
     IsInstalled = False
-    print 'checking '+package+'...'
+    print 'checking if '+package+' is already installed'
     cmd = CheckProcessOutput(dpkg_query+' -W -f=\'${Status} ${Version}\' '+package)
     if 'not-installed' in str(cmd) or 'deinstall' in str(cmd):
         print package+' is not installed....ok\n'
     elif 'install ok' in cmd:
-        print package+' is installed....skipping\n'
+        print package+' is already installed....skipping\n'
         IsInstalled = True
     else:
+        print package+' is not installed....ok\n'
         IsInstalled = False
     return IsInstalled
 
@@ -134,28 +131,14 @@ def InstFromList():
                  InstFromRepo(p)
 
 def InstFromRepo(package):
-    RunProcess(apt_get+' install --no,install-recommends '+package)
-    #try:
-    #    DEVNULL = open(os.devnull, 'wb')
-    #    cmd = subprocess.Popen([apt_get , 'install' , '--no-install-recommends'
-    #                           , package ])
-    #    cmd.wait()
-    #    DEVNULL.close()
-    #except:
-    #    print "error connecting to repositories,check internet connectivity"
-    #print "\n"
-
+    RunProcess(apt_get+' install --no-install-recommends '+package)
 
 def InstFromFile(package):
-    cmd = subprocess.call([dpkg , '-i' , package] )
-    if cmd != 0:
+    cmd = RunProcess('dpkg -i '+package)
+    if cmd.returncode != 0:
         print "forcing dependencies installation"
-        try:
-            ps = subprocess.Popen(['apt-get' ,'--no-install-recommends',
-                                   '-f', 'install'])
-            ps.wait()
-        except:
-            print "error forcing dependencies installation"
+        RunProcess(apt_get+' --no-install-recommends -f install')
+
 
 def InstFromDebFolder():
     folder="deb_pkgs"
@@ -192,20 +175,8 @@ def AddRepo(repofile,repo):
         except:
             print "error creating "+repofile+" file"
 
-def RunAptUdate():
-    try:
-        ps = subprocess.Popen(['apt-get','update'])
-        ps.wait()
-    except:
-        print "error connecting to repositories,check internet connectivity"
-
 def AddAptKey(keyserver,key):
-    try:
-        ps = subprocess.Popen(['apt-key','adv','--keyserver',
-                               keyserver,'--recv-keys',key])
-        ps.wait()
-    except:
-        print "error adding key"
+    RunProcess(apt_key+' adv --keyserver '+keyserver+' --recv-keys '+key)
 
 def InstSpotify():
     #taken from https://www.spotify.com/it/download/linux/
@@ -217,7 +188,7 @@ def InstSpotify():
                       "BBEBDCB318AD50EC6865090613B00F1FD2C19886")
             AddRepo("/etc/apt/sources.list.d/spotify.list",
                     "deb http://repository.spotify.com stable non-free")
-            RunAptUdate()
+            RunProcess('apt-get update')
             InstFromRepo("spotify-client")
 
 def InstSkype():
@@ -225,11 +196,10 @@ def InstSkype():
     if r == 'y':
         IsInst = CheckIfDebIsInstalled("skypeforlinux")
         if not IsInst:
-            req = "apt-transport-https"
             keyurl = "https://repo.skype.com/data/SKYPE-GPG-KEY"
-            IsInst = CheckIfDebIsInstalled(req)
+            IsInst = CheckIfDebIsInstalled("apt-transport-https")
             if not IsInst:
-                InstFromRepo(req)
+                InstFromRepo("apt-transport-https")
             try:
                 ps = subprocess.Popen(['wget','-qO-',keyurl],
                                       stdout=subprocess.PIPE)
@@ -240,7 +210,7 @@ def InstSkype():
                     "deb [arch=amd64] https://repo.skype.com/deb stable main")
             except subprocess.CalledProcessError as grepexc:
                 print "error code", grepexc.returncode, grepexc.output
-            RunAptUdate()
+            RunProcess('apt-get update')
             InstFromRepo("skypeforlinux")
 
 def InstDropbox():
@@ -254,7 +224,7 @@ def InstDropbox():
             distro_ver = str(linux_ver[2]).lower()
             AddRepo("/etc/apt/sources.list.d/dropbox.list",
                  "deb http://linux.dropbox.com/"+distro+" "+distro_ver+" main" )
-            RunAptUdate()
+            RunProcess('apt-get update')
             InstFromRepo("dropbox")
 
 def InstExtras():
@@ -266,14 +236,10 @@ if __name__ == "__main__":
     WhoAmI()
     linux_distro = CheckLinuxVer()
     if linux_distro[0] == "Ubuntu" or linux_distro[0] == "Debian":
-        for i in apt_get,apt_cache,dpkg,dpkg_query:
+        for i in apt_get,apt_cache,dpkg,dpkg_query,apt_key:
             CheckPath(i)
-        #InstFromList()
-        #InstFromDebFolder()
-        #InstExtras()
-        CheckIfDebIsInstalled("vim")
-        CheckIfDebIsInstalled("vimsss")
-        CheckIfDebIsInstalled("calibre")
-        CheckIfDebIsInstalled("atom")
+        InstFromList()
+        InstFromDebFolder()
+        InstExtras()
     else:
         print "unsupported Linux distro.Works only with Debian/Ubuntu"
