@@ -13,7 +13,6 @@ dpkg_query = '/usr/bin/dpkg-query'
 apt_get= '/usr/bin/apt-get'
 dpkg = '/usr/bin/dpkg'
 apt_key = '/usr/bin/apt-key'
-folder = 'deb_pkgs'
 
 def WhoAmI():
     if os.geteuid() != 0:
@@ -44,10 +43,14 @@ def CheckLinuxArch():
 def CheckArgs():
     parser = argparse.ArgumentParser(description="""
                                   apyt - automagically install .deb packages""")
-    parser.add_argument("-f", help="packages file", required=True)
+    parser.add_argument("-f", help="packages file", metavar="file" ,required=True)
+    parser.add_argument("-d", help=".deb directory", metavar="dir" ,required=False)
     args = parser.parse_args()
     if args.f and CheckPath(args.f):
-        return args.f
+        if args.d and CheckPath(args.d):
+            return args.f,args.d
+        else:
+            return args.f
 
 def RunProcess(command):
     try:
@@ -69,6 +72,8 @@ def CheckProcessOutput(command):
 
 def CheckDupPkgs():
     pack = CheckArgs()
+    if type(pack) is tuple:
+        pack = pack[0]
     no_duplicates = set()
     with open(pack, 'r') as f:
         sorted_file = f.readlines()
@@ -141,17 +146,21 @@ def InstFromFile(package):
 
 
 def InstFromDebFolder():
-    r = ReplyYN('do you want to install packages from the %s folder?' %folder)
-    if r == 'y':
-        debs = os.listdir(folder)
-        if debs:
-            for i in debs:
-                if str(i).endswith('.deb'):
-                    repl = ReplyYN('do you want to install %s ?' %i)
-                    if repl == "y":
-                        InstFromFile('%s/%s' %(fodler,i))
-        else:
-            print "empty folder"
+    f = CheckArgs()
+    if type(f) is tuple:
+        f = f[1]
+        if f:
+            r = ReplyYN('do you want to install packages from the %s folder?' %f)
+            if r == 'y':
+                debs = os.listdir(f)
+                if debs:
+                    for i in debs:
+                        if str(i).endswith('.deb'):
+                            repl = ReplyYN('do you want to install %s ?' %i)
+                            if repl == "y":
+                                InstFromFile('%s/%s' %(f,i))
+                else:
+                    print "empty folder"
 
 def AddRepo(repofile,repo):
     if CheckPath(repofile):
@@ -235,7 +244,7 @@ if __name__ == "__main__":
     WhoAmI()
     linux_distro = CheckLinuxVer()
     if linux_distro[0] == "Ubuntu" or linux_distro[0] == "Debian":
-        for i in apt_get,apt_cache,dpkg,dpkg_query,apt_key,folder:
+        for i in apt_get,apt_cache,dpkg,dpkg_query,apt_key:
             CheckPath(i)
         InstFromList()
         InstFromDebFolder()
