@@ -6,12 +6,14 @@ import subprocess
 import re
 import platform
 import shlex
+import argparse
 
 apt_cache = '/usr/bin/apt-cache'
 dpkg_query = '/usr/bin/dpkg-query'
 apt_get= '/usr/bin/apt-get'
 dpkg = '/usr/bin/dpkg'
 apt_key = '/usr/bin/apt-key'
+folder = 'deb_pkgs'
 
 def WhoAmI():
     if os.geteuid() != 0:
@@ -21,13 +23,15 @@ def WhoAmI():
 def ReplyYN(message):
     reply = ""
     while reply != 'y' and reply != 'n':
-        reply = str(raw_input(message + ' [y/n]'))
+        reply = str(raw_input('%s [y/n]' %message))
     return reply
 
 def CheckPath(file_or_folder):
     if not os.path.exists(file_or_folder):
-        print file_or_folder+' not found'
+        print "%s not found" %file_or_folder
         sys.exit(1)
+    else:
+        return True
 
 def CheckLinuxVer():
     distro = platform.linux_distribution()
@@ -38,16 +42,12 @@ def CheckLinuxArch():
     return arch
 
 def CheckArgs():
-    if len(sys.argv) == 2 and os.path.isfile(sys.argv[1]):
-            pkgs = sys.argv[1]
-    elif len(sys.argv) < 2 or len(sys.argv) > 2:
-        print "wrong parameters used"
-        print "usage: " + sys.argv[0] + " package_file_list"
-        sys.exit(1)
-    else:
-        print "file not found"
-        sys.exit(1)
-    return pkgs
+    parser = argparse.ArgumentParser(description="""
+                                  apyt - automagically install .deb packages""")
+    parser.add_argument("-f", help="packages file", required=True)
+    args = parser.parse_args()
+    if args.f and CheckPath(args.f):
+        return args.f
 
 def RunProcess(command):
     try:
@@ -78,7 +78,7 @@ def CheckDupPkgs():
         if re.match(r'\S', stritem) and not stritem.startswith('#'):
             if stritem in no_duplicates:
                 print """duplicate package found please remove it and try again.
-                       \rPackage duplicated: """ + stritem
+                       \rPackage duplicated: """ ,stritem
                 sys.exit(1)
             else:
                 no_duplicates.add(stritem)
@@ -86,37 +86,37 @@ def CheckDupPkgs():
 
 def CheckIfInRepo(package):
     IsInRepo = True
-    print "check if "+package+" is in repo....."
+    print "check if %s is in repo....." %package
     try:
      DEVNULL = open(os.devnull, 'wb')
      ps = subprocess.Popen([apt_cache, 'search', '-n' , '-q' , package],
                            stdout=subprocess.PIPE)
-     output = subprocess.Popen(['awk', '($1=="'+package+'") {print}'],
-                               stdin=ps.stdout ,stderr=DEVNULL,
-                               stdout=subprocess.PIPE)
+     output = subprocess.Popen(['awk', '($1=="%s") {print}' %package],
+                              stdin=ps.stdout ,stderr=DEVNULL,
+                              stdout=subprocess.PIPE)
      output1 = subprocess.check_output(['wc','-l'], stdin=output.stdout)
      ps.wait()
      DEVNULL.close()
      if int(output1) == 0:
-        print package+" is not in repository.....skipping \n"
+        print "%s is not in repository.....skipping \n" %package
         IsInRepo = False
      elif int(output1) == 1:
-        print package+" is in repository.......ok \n"
+        print "%s is in repository.......ok \n" %package
     except subprocess.CalledProcessError as grepexc:
        print "error code", grepexc.returncode, grepexc.output
     return IsInRepo
 
 def CheckIfDebIsInstalled(package):
     IsInstalled = False
-    print 'checking if '+package+' is already installed'
-    cmd = CheckProcessOutput(dpkg_query+' -W -f=\'${Status} ${Version}\' '+package)
+    print 'checking if %s is already installed' %package
+    cmd = CheckProcessOutput('%s -W -f=\'${Status} ${Version}\' %s' %(dpkg_query,package))
     if 'not-installed' in str(cmd) or 'deinstall' in str(cmd):
-        print package+' is not installed....ok\n'
+        print '%s is not installed....ok\n' %package
     elif 'install ok' in cmd:
-        print package+' is already installed....skipping\n'
+        print '%s is already installed....skipping\n' %package
         IsInstalled = True
     else:
-        print package+' is not installed....ok\n'
+        print '%s is not installed....ok\n' %package
         IsInstalled = False
     return IsInstalled
 
@@ -131,31 +131,30 @@ def InstFromList():
                  InstFromRepo(p)
 
 def InstFromRepo(package):
-    RunProcess(apt_get+' install --no-install-recommends '+package)
+    RunProcess('%s install --no-install-recommends %s' %(apt_get,package))
 
 def InstFromFile(package):
-    cmd = RunProcess('dpkg -i '+package)
+    cmd = RunProcess('dpkg -i %s' %package)
     if cmd.returncode != 0:
         print "forcing dependencies installation"
-        RunProcess(apt_get+' --no-install-recommends -f install')
+        RunProcess('%s --no-install-recommends -f install' %apt_get)
 
 
 def InstFromDebFolder():
-    folder="deb_pkgs"
-    r = ReplyYN('do you want to install packages from the '+folder+' folder?')
-    if r == 'y' and os.path.exists(folder):
+    r = ReplyYN('do you want to install packages from the %s folder?' %folder)
+    if r == 'y':
         debs = os.listdir(folder)
         if debs:
             for i in debs:
                 if str(i).endswith('.deb'):
-                    repl = ReplyYN('do you want to install '+i+' ?')
+                    repl = ReplyYN('do you want to install %s ?' %i)
                     if repl == "y":
-                        InstFromFile(folder+'/'+i)
+                        InstFromFile('%s/%s' %(fodler,i))
         else:
             print "empty folder"
 
 def AddRepo(repofile,repo):
-    if os.path.exists(repofile):
+    if CheckPath(repofile):
         try:
             with open(repofile, 'r') as configfile:
                 if repo in configfile.read():
@@ -165,18 +164,18 @@ def AddRepo(repofile,repo):
                         with open(repofile, 'ab') as configfile:
                             configfile.write(repo)
                     except:
-                        print "error opening "+repofile+" in write-append mode"
+                        print "error opening %s in write-append mode" %repofile
         except:
-            print "error opening "+repofile+" in read-only mode"
+            print "error opening in read-only mode" %repofile
     else:
         try:
             with open(repofile, 'w') as configfile:
                 configfile.write(repo)
         except:
-            print "error creating "+repofile+" file"
+            print "error creating %s file" %repofile
 
 def AddAptKey(keyserver,key):
-    RunProcess(apt_key+' adv --keyserver '+keyserver+' --recv-keys '+key)
+    RunProcess('%s adv --keyserver %s --recv-keys %s' % (apt_key,keyserver,key))
 
 def InstSpotify():
     #taken from https://www.spotify.com/it/download/linux/
@@ -223,7 +222,7 @@ def InstDropbox():
             distro = str(linux_ver[0]).lower()
             distro_ver = str(linux_ver[2]).lower()
             AddRepo("/etc/apt/sources.list.d/dropbox.list",
-                 "deb http://linux.dropbox.com/"+distro+" "+distro_ver+" main" )
+                 "deb http://linux.dropbox.com/%s %s main" %(distro,distro_ver))
             RunProcess('apt-get update')
             InstFromRepo("dropbox")
 
@@ -236,7 +235,7 @@ if __name__ == "__main__":
     WhoAmI()
     linux_distro = CheckLinuxVer()
     if linux_distro[0] == "Ubuntu" or linux_distro[0] == "Debian":
-        for i in apt_get,apt_cache,dpkg,dpkg_query,apt_key:
+        for i in apt_get,apt_cache,dpkg,dpkg_query,apt_key,folder:
             CheckPath(i)
         InstFromList()
         InstFromDebFolder()
