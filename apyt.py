@@ -175,7 +175,7 @@ def AddRepo(repofile,repo):
                     except:
                         print "error opening %s in write-append mode" %repofile
         except:
-            print "error opening in read-only mode" %repofile
+            print "error opening %s in read-only mode" %repofile
     else:
         try:
             with open(repofile, 'w') as configfile:
