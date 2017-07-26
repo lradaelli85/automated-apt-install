@@ -8,11 +8,8 @@ import platform
 import shlex
 import argparse
 
-apt_cache = '/usr/bin/apt-cache'
-dpkg_query = '/usr/bin/dpkg-query'
-apt_get= '/usr/bin/apt-get'
-dpkg = '/usr/bin/dpkg'
-apt_key = '/usr/bin/apt-key'
+commands = ['/usr/bin/apt-cache','/usr/bin/dpkg-query','/usr/bin/apt-get',
+            '/usr/bin/dpkg', '/usr/bin/apt-key']
 
 def WhoAmI():
     if os.geteuid() != 0:
@@ -94,7 +91,7 @@ def CheckIfInRepo(package):
     print "check if %s is in repo....." %package
     try:
      DEVNULL = open(os.devnull, 'wb')
-     ps = subprocess.Popen([apt_cache, 'search', '-n' , '-q' , package],
+     ps = subprocess.Popen(['/usr/bin/apt-cache search', '-n' , '-q' , package],
                            stdout=subprocess.PIPE)
      output = subprocess.Popen(['awk', '($1=="%s") {print}' %package],
                               stdin=ps.stdout ,stderr=DEVNULL,
@@ -114,7 +111,7 @@ def CheckIfInRepo(package):
 def CheckIfDebIsInstalled(package):
     IsInstalled = False
     print 'checking if %s is already installed' %package
-    cmd = CheckProcessOutput('%s -W -f=\'${Status} ${Version}\' %s' %(dpkg_query,package))
+    cmd = CheckProcessOutput('/usr/bin/dpkg-query -W -f=\'${Status} ${Version}\' %s' %package)
     if 'not-installed' in str(cmd) or 'deinstall' in str(cmd):
         print '%s is not installed....ok\n' %package
     elif 'install ok' in cmd:
@@ -136,13 +133,13 @@ def InstFromList():
                  InstFromRepo(p)
 
 def InstFromRepo(package):
-    RunProcess('%s install --no-install-recommends %s' %(apt_get,package))
+    RunProcess('/usr/bin/apt-get install --no-install-recommends %s' %package)
 
 def InstFromFile(package):
     cmd = RunProcess('dpkg -i %s' %package)
     if cmd.returncode != 0:
         print "forcing dependencies installation"
-        RunProcess('%s --no-install-recommends -f install' %apt_get)
+        RunProcess('/usr/bin/apt-get --no-install-recommends -f install')
 
 
 def InstFromDebFolder():
@@ -184,7 +181,7 @@ def AddRepo(repofile,repo):
             print "error creating %s file" %repofile
 
 def AddAptKey(keyserver,key):
-    RunProcess('%s adv --keyserver %s --recv-keys %s' % (apt_key,keyserver,key))
+    RunProcess('/usr/bin/apt-key adv --keyserver %s --recv-keys %s' %(keyserver,key))
 
 def InstSpotify():
     #taken from https://www.spotify.com/it/download/linux/
@@ -244,7 +241,7 @@ if __name__ == "__main__":
     WhoAmI()
     linux_distro = CheckLinuxVer()
     if linux_distro[0] == "Ubuntu" or linux_distro[0] == "Debian":
-        for i in apt_get,apt_cache,dpkg,dpkg_query,apt_key:
+        for i in commands:
             CheckPath(i)
         InstFromList()
         InstFromDebFolder()

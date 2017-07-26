@@ -13,7 +13,7 @@ vim-runtime
 vim-tiny
 whois
 terminator
-whois
+#whois
 traceroute
 mtr
 #easy-rsa
