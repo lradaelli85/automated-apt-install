@@ -91,9 +91,9 @@ def CheckIfInRepo(package):
     print "check if %s is in repo....." %package
     try:
      DEVNULL = open(os.devnull, 'wb')
-     ps = subprocess.Popen(['/usr/bin/apt-cache search', '-n' , '-q' , package],
-                           stdout=subprocess.PIPE)
-     output = subprocess.Popen(['awk', '($1=="%s") {print}' %package],
+     ps = subprocess.Popen(['/usr/bin/apt-cache', 'search', '-n' , '-q' ,
+                           package], stdout=subprocess.PIPE)
+     output = subprocess.Popen(['awk', '($1==\"%s\") {print}' %package],
                               stdin=ps.stdout ,stderr=DEVNULL,
                               stdout=subprocess.PIPE)
      output1 = subprocess.check_output(['wc','-l'], stdin=output.stdout)
@@ -132,6 +132,7 @@ def InstFromList():
              if inrepo:
                  InstFromRepo(p)
 
+
 def InstFromRepo(package):
     RunProcess('/usr/bin/apt-get install --no-install-recommends %s' %package)
 
@@ -160,7 +161,7 @@ def InstFromDebFolder():
                     print "empty folder"
 
 def AddRepo(repofile,repo):
-    if CheckPath(repofile):
+    if os.path.exists(repofile):
         try:
             with open(repofile, 'r') as configfile:
                 if repo in configfile.read():
